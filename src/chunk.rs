@@ -7,7 +7,7 @@ use anyhow::{anyhow, Error, Result};
 
 use crate::chunk_type::ChunkType;
 
-use crc::{Crc, CRC_32_CKSUM, CRC_32_ISO_HDLC};
+use crc::{Crc, CRC_32_ISO_HDLC};
 
 /// A validated PNG chunk. See the PNG Spec for more details
 /// http://www.libpng.org/pub/png/spec/1.2/PNG-Structure.html
