@@ -1,9 +1,13 @@
-use std::{fmt::Display, path::Path};
+use std::{fmt::Display, io::Read, path::Path, str::FromStr};
 
-use anyhow::{anyhow, Error, Result};
+use anyhow::{bail, Error, Ok, Result};
 
-use crate::chunk::Chunk;
-pub struct Png {}
+use crate::{chunk::Chunk, chunk_type::ChunkType};
+
+#[derive(Debug)]
+pub struct Png {
+    chunks: Vec<Chunk>,
+}
 
 impl Png {
     // Fill in this array with the correct values per the PNG spec
@@ -11,7 +15,7 @@ impl Png {
 
     /// Creates a `Png` from a list of chunks using the correct header
     pub fn from_chunks(chunks: Vec<Chunk>) -> Self {
-        todo!()
+        Self { chunks }
     }
 
     /// Creates a `Png` from a file path
@@ -21,35 +25,52 @@ impl Png {
 
     /// Appends a chunk to the end of this `Png` file's `Chunk` list.
     pub fn append_chunk(&mut self, chunk: Chunk) {
-        todo!()
+        self.chunks.push(chunk)
     }
 
     /// Searches for a `Chunk` with the specified `chunk_type` and removes the first
     /// matching `Chunk` from this `Png` list of chunks.
     pub fn remove_chunk(&mut self, chunk_type: &str) -> Result<Chunk> {
-        todo!()
+        let index = self
+            .chunks
+            .iter()
+            .position(|chunk| chunk.chunk_type().to_string() == chunk_type)
+            .ok_or(PngError::ChunkNotFoundError(String::from(chunk_type)))?;
+        Ok(self.chunks.remove(index))
     }
 
     /// The header of this PNG.
     pub fn header(&self) -> &[u8; 8] {
-        todo!()
+        &Self::STANDARD_HEADER
     }
 
     /// Lists the `Chunk`s stored in this `Png`
     pub fn chunks(&self) -> &[Chunk] {
-        todo!()
+        &self.chunks
     }
 
     /// Searches for a `Chunk` with the specified `chunk_type` and returns the first
     /// matching `Chunk` from this `Png`.
     pub fn chunk_by_type(&self, chunk_type: &str) -> Option<&Chunk> {
-        todo!()
+        self.chunks
+            .iter()
+            .find(|chunk| chunk.chunk_type().to_string() == chunk_type)
     }
 
     /// Returns this `Png` as a byte sequence.
     /// These bytes will contain the header followed by the bytes of all of the chunks.
     pub fn as_bytes(&self) -> Vec<u8> {
-        todo!()
+        let chunk_bytes: Vec<u8> = self
+            .chunks
+            .iter()
+            .flat_map(|chunk| chunk.as_bytes())
+            .collect();
+
+        Self::STANDARD_HEADER
+            .iter()
+            .chain(chunk_bytes.iter())
+            .copied()
+            .collect()
     }
 }
 
@@ -57,14 +78,43 @@ impl TryFrom<&[u8]> for Png {
     type Error = Error;
 
     fn try_from(value: &[u8]) -> Result<Self> {
-        todo!()
+        if value.len() < Self::STANDARD_HEADER.len() {
+            bail!(PngError::FileTooSmallError)
+        }
+
+        let (header_bytes, data_bytes) = value.split_at(Self::STANDARD_HEADER.len());
+        if header_bytes != Self::STANDARD_HEADER {
+            bail!(PngError::NotStandardPngHeaderError)
+        } else {
+            let mut index = 0;
+            let mut chunks: Vec<Chunk> = vec![];
+            while index < data_bytes.len() {
+                let data_length = u32::from_be_bytes(data_bytes[index..index + 4].try_into()?);
+                let length = 4 + 4 + data_length as usize + 4;
+
+                let chunk = Chunk::try_from(&data_bytes[index..index + length])?;
+                chunks.push(chunk);
+                index += length;
+            }
+            Ok(Self { chunks })
+        }
     }
 }
 
 impl Display for Png {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        todo!()
+        writeln!(f, "Png {:?}", &self)
     }
+}
+
+#[derive(Debug, thiserror::Error)]
+pub enum PngError {
+    #[error("Input is less than 8 bytes")]
+    FileTooSmallError,
+    #[error("The header is not a standard PNG header")]
+    NotStandardPngHeaderError,
+    #[error("Chunk of type {0} is not found")]
+    ChunkNotFoundError(String),
 }
 
 #[cfg(test)]

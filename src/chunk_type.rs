@@ -95,7 +95,7 @@ impl Display for ChunkType {
 pub enum ChunkTypeError {
     #[error("Expected 4 bytes but received `{0}` when creating chunk type")]
     ByteLengthError(String),
-    #[error("Input btye {0} is not valid ascii characters")]
+    #[error("Input btye {0} is not valid ascii alphabetic")]
     InvalidAsciiError(u8),
 }
 
