@@ -3,7 +3,7 @@ use std::io::BufReader;
 use std::io::Read;
 use std::str::FromStr;
 
-use anyhow::anyhow;
+use anyhow::bail;
 use anyhow::Error;
 use anyhow::Result;
 
@@ -67,7 +67,7 @@ impl FromStr for ChunkType {
 
     fn from_str(s: &str) -> Result<Self> {
         if s.len() != 4 {
-            Err(anyhow!("String length not valid: {}", s))
+            bail!(ChunkTypeError::ByteLengthError(String::from(s)))
         } else {
             let mut reader = BufReader::new(s.as_bytes());
             let mut buffer: [u8; 4] = [0; 4];
@@ -76,7 +76,7 @@ impl FromStr for ChunkType {
 
             for byte in buffer {
                 if !ChunkType::is_valid_byte(byte) {
-                    return Err(anyhow!("byte not valid: {}", byte));
+                    bail!(ChunkTypeError::InvalidAsciiError(byte))
                 }
             }
 
@@ -89,6 +89,14 @@ impl Display for ChunkType {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "{}", String::from_utf8_lossy(&self.bytes))
     }
+}
+
+#[derive(Debug, thiserror::Error)]
+pub enum ChunkTypeError {
+    #[error("Expected 4 bytes but received `{0}` when creating chunk type")]
+    ByteLengthError(String),
+    #[error("Input btye {0} is not valid ascii characters")]
+    InvalidAsciiError(u8),
 }
 
 #[cfg(test)]

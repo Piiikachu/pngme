@@ -3,7 +3,7 @@ use std::io::{BufReader, Read};
 use std::ops::Deref;
 use std::{fmt, vec};
 
-use anyhow::{anyhow, Error, Result};
+use anyhow::{bail, Error, Result};
 
 use crate::chunk_type::ChunkType;
 
@@ -104,21 +104,20 @@ impl TryFrom<&[u8]> for Chunk {
         reader.read_exact(&mut buffer)?;
         let crc = u32::from_be_bytes(buffer);
 
-        let real_crc = calculate_crc(&chunk_type, &data);
+        let expect_crc = calculate_crc(&chunk_type, &data);
 
-        if crc == real_crc {
+        if crc == expect_crc {
             Ok(Self {
                 length,
                 chunk_type,
                 data,
-                crc: real_crc,
+                crc: expect_crc,
             })
         } else {
-            Err(anyhow!(
-                "crc value not valid, expect {}, got {}",
-                real_crc,
-                crc
-            ))
+            bail!(ChunkError::CRC_UNMATCH_ERROR {
+                expected: expect_crc,
+                found: crc
+            })
         }
     }
 }
@@ -133,6 +132,12 @@ impl fmt::Display for Chunk {
         writeln!(f, "}}",)?;
         Ok(())
     }
+}
+
+#[derive(Debug, thiserror::Error)]
+pub enum ChunkError {
+    #[error("Invalid crc value, expect {expected:?}, found {found:?}")]
+    CRC_UNMATCH_ERROR { expected: u32, found: u32 },
 }
 
 #[cfg(test)]
