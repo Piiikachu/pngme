@@ -11,6 +11,7 @@ use anyhow::Result;
 pub struct ChunkType {
     bytes: [u8; 4],
 }
+
 impl ChunkType {
     /// Returns the raw bytes contained in this chunk
     pub fn bytes(&self) -> [u8; 4] {
