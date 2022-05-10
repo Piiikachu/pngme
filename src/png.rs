@@ -1,8 +1,8 @@
-use std::{fmt::Display, io::Read, path::Path, str::FromStr};
+use std::{fmt::Display, path::Path};
 
-use anyhow::{bail, Error, Ok, Result};
+use anyhow::{bail, Error, Result};
 
-use crate::{chunk::Chunk, chunk_type::ChunkType};
+use crate::chunk::Chunk;
 
 #[derive(Debug)]
 pub struct Png {
@@ -20,7 +20,8 @@ impl Png {
 
     /// Creates a `Png` from a file path
     pub fn from_file<P: AsRef<Path>>(path: P) -> Result<Self> {
-        todo!()
+        let bytes = std::fs::read(path)?;
+        Ok(from_bytes(&bytes)?)
     }
 
     /// Appends a chunk to the end of this `Png` file's `Chunk` list.
@@ -78,26 +79,30 @@ impl TryFrom<&[u8]> for Png {
     type Error = Error;
 
     fn try_from(value: &[u8]) -> Result<Self> {
-        if value.len() < Self::STANDARD_HEADER.len() {
-            bail!(PngError::FileTooSmallError)
-        }
+        from_bytes(value)
+    }
+}
 
-        let (header_bytes, data_bytes) = value.split_at(Self::STANDARD_HEADER.len());
-        if header_bytes != Self::STANDARD_HEADER {
-            bail!(PngError::NotStandardPngHeaderError)
-        } else {
-            let mut index = 0;
-            let mut chunks: Vec<Chunk> = vec![];
-            while index < data_bytes.len() {
-                let data_length = u32::from_be_bytes(data_bytes[index..index + 4].try_into()?);
-                let length = 4 + 4 + data_length as usize + 4;
+fn from_bytes(value: &[u8]) -> Result<Png> {
+    if value.len() < Png::STANDARD_HEADER.len() {
+        bail!(PngError::FileTooSmallError)
+    }
 
-                let chunk = Chunk::try_from(&data_bytes[index..index + length])?;
-                chunks.push(chunk);
-                index += length;
-            }
-            Ok(Self { chunks })
+    let (header_bytes, data_bytes) = value.split_at(Png::STANDARD_HEADER.len());
+    if header_bytes != Png::STANDARD_HEADER {
+        bail!(PngError::NotStandardPngHeaderError)
+    } else {
+        let mut index = 0;
+        let mut chunks: Vec<Chunk> = vec![];
+        while index < data_bytes.len() {
+            let data_length = u32::from_be_bytes(data_bytes[index..index + 4].try_into()?);
+            let length = 4 + 4 + data_length as usize + 4;
+
+            let chunk = Chunk::try_from(&data_bytes[index..index + length])?;
+            chunks.push(chunk);
+            index += length;
         }
+        Ok(Png { chunks })
     }
 }
 
